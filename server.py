@@ -46,7 +46,15 @@ def connections():
             "listening_count": 0,
             "note": str(e)
         }), 200
-
+@app.get("/api/traffic")
+def traffic():
+    counters = psutil.net_io_counters()
+    return jsonify({
+        "bytes_sent": counters.bytes_sent,
+        "bytes_recv": counters.bytes_recv,
+        "sent_mb": round(counters.bytes_sent / (1024 * 1024), 2),
+        "recv_mb": round(counters.bytes_recv / (1024 * 1024), 2)
+    })
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5000"))
     app.run(host="127.0.0.1" if os.environ.get("LOCAL_ONLY", "1") == "1" else "0.0.0.0", port=port, debug=False)
