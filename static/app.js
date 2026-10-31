@@ -106,3 +106,53 @@ function drawTrafficChart() {
 refreshTraffic();
 setInterval(refreshTraffic, 5000);
 window.addEventListener("resize", drawTrafficChart);
+// Rule-based suspicious connection monitoring
+const suspiciousConnections = new Set();
+
+async function checkSuspiciousConnections() {
+  try {
+    const response = await fetch("/api/connections");
+    if (!response.ok) throw new Error("Connection API unavailable");
+
+    const data = await response.json();
+    const counts = new Map();
+
+    data.connections.forEach(connection => {
+      if (connection.state !== "ESTABLISHED" || !connection.remote) return;
+
+      const remote = connection.remote;
+      const host = remote.startsWith("[")
+        ? remote.slice(1, remote.indexOf("]"))
+        : remote.substring(0, remote.lastIndexOf(":"));
+
+      if (!host || host === "127.0.0.1" || host === "::1") return;
+
+      counts.set(host, (counts.get(host) || 0) + 1);
+    });
+
+    const currentAlerts = new Set();
+
+    counts.forEach((count, host) => {
+      if (count >= 8) {
+        currentAlerts.add(host);
+
+        if (!suspiciousConnections.has(host)) {
+          addEvent(
+            "Unusual connection count detected",
+            host + " has " + count + " simultaneous established connections. Please investigate.",
+            "medium"
+          );
+        }
+      }
+    });
+
+    suspiciousConnections.clear();
+    currentAlerts.forEach(host => suspiciousConnections.add(host));
+
+  } catch (error) {
+    console.log("Suspicious connection check:", error.message);
+  }
+}
+
+checkSuspiciousConnections();
+setInterval(checkSuspiciousConnections, 15000);
